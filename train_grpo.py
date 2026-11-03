@@ -5,6 +5,7 @@
     python train_grpo.py --run-name grpo_sft --model outputs/sft_merged  # after the SFT warm-up
     python train_grpo.py --run-name timing --max-steps 10              # speed / memory check
     python train_grpo.py --run-name grpo_zero --resume                 # continue from the last checkpoint
+    python train_grpo.py --run-name grpo_weak --init-adapter outputs/grpo_zero --data data/spider_train_weak.jsonl
 """
 import argparse
 import os
@@ -13,7 +14,7 @@ import sys
 import torch
 from datasets import load_dataset
 from peft import LoraConfig
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, TrainerCallback
 from trl import GRPOConfig, GRPOTrainer
 
 import sql_rewards
@@ -31,6 +32,7 @@ p.add_argument("--max-completion-length", type=int, default=1024)
 p.add_argument("--continuous-batching", action=argparse.BooleanOptionalAction, default=True,
                help="transformers' paged generation engine: 49 vs 63 s/step and 13.2 vs 15.8 GB peak on a 5060 Ti")
 p.add_argument("--resume", action="store_true")
+p.add_argument("--init-adapter", help="keep training this LoRA adapter (fresh optimizer) instead of a new one")
 args = p.parse_args()
 
 os.environ.setdefault("WANDB_PROJECT", "text2sql-grpo")
@@ -38,8 +40,25 @@ for stream in (sys.stdout, sys.stderr):  # TRL's sample table crashed on cp1252 
     stream.reconfigure(encoding="utf-8", errors="replace")
 sql_rewards.TIMEOUT = 3.0  # Spider gold queries run in milliseconds; this only stops runaway attempts
 
+class Bf16Up(TrainerCallback):
+    """TRL's continuous-batching generation casts the whole model, LoRA included, to bf16 in place, so the optimizer
+    state ends up bf16. On --resume the Trainer reloads the adapter (and so the optimizer state) as fp32 first, and the
+    first optimizer step then fails on mixed dtypes. Do TRL's cast up front, optimizer state included."""
+
+    def on_train_begin(self, args, state, control, model=None, optimizer=None, **kwargs):
+        model.to(torch.bfloat16)
+        for s in getattr(optimizer, "optimizer", optimizer).state.values():
+            for k, v in s.items():
+                if k != "step" and torch.is_tensor(v) and v.is_floating_point():
+                    s[k] = v.to(torch.bfloat16)
+
+
 tok = AutoTokenizer.from_pretrained(args.model, padding_side="left")
 model = AutoModelForCausalLM.from_pretrained(args.model, dtype=torch.bfloat16, device_map="cuda")
+if args.init_adapter:
+    from peft import PeftModel
+
+    model = PeftModel.from_pretrained(model, args.init_adapter, is_trainable=True)
 
 config = GRPOConfig(
     output_dir=f"outputs/{args.run_name}",
@@ -69,8 +88,10 @@ trainer = GRPOTrainer(
     processing_class=tok,
     reward_funcs=[format_reward, execution_reward],
     args=config,
+    callbacks=[Bf16Up()],
     train_dataset=load_dataset("json", data_files=args.data, split="train"),
-    peft_config=LoraConfig(r=16, lora_alpha=32, lora_dropout=0.0, target_modules="all-linear", task_type="CAUSAL_LM"),
+    peft_config=None if args.init_adapter else LoraConfig(
+        r=16, lora_alpha=32, lora_dropout=0.0, target_modules="all-linear", task_type="CAUSAL_LM"),
 )
 result = trainer.train(resume_from_checkpoint=args.resume or None)
 trainer.save_model()

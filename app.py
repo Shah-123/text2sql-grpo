@@ -1,6 +1,6 @@
 """Gradio demo: ask a question about a SQLite database, get the model's reasoning, its SQL and the result.
 
-    python app.py                    # base model + GRPO adapter (outputs/grpo_zero)
+    python app.py                    # base model + GRPO adapter (outputs/grpo_weak, run 2)
     python app.py --adapter ""       # base model only
 
 Queries run on a read-only connection, SELECT/WITH only, with a 5 s limit (see sql_rewards.execute).
@@ -18,7 +18,7 @@ from sql_rewards import execute, extract_sql
 
 p = argparse.ArgumentParser()
 p.add_argument("--model", default="Qwen/Qwen2.5-Coder-3B-Instruct")
-p.add_argument("--adapter", default="outputs/grpo_zero")
+p.add_argument("--adapter", default="outputs/grpo_weak")
 args = p.parse_args()
 
 tok = AutoTokenizer.from_pretrained(args.model)
