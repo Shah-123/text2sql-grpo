@@ -1,0 +1,15 @@
+{
+  "data": "data/spider_dev.jsonl",
+  "model": "Qwen/Qwen2.5-Coder-3B-Instruct",
+  "adapter": "outputs/grpo_zero",
+  "strict": true,
+  "n": 1034,
+  "accuracy": {
+    "all": 67.2
+  },
+  "labels": {
+    "correct": 695,
+    "exec_error": 103,
+    "wrong_result": 236
+  }
+}

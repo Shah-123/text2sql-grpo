@@ -1,0 +1,20 @@
+{
+  "data": "data/bird_minidev.jsonl",
+  "model": "Qwen/Qwen2.5-Coder-3B-Instruct",
+  "adapter": "outputs/grpo_zero",
+  "strict": true,
+  "n": 500,
+  "accuracy": {
+    "all": 36.0,
+    "simple": 52.7,
+    "moderate": 31.6,
+    "challenging": 22.5
+  },
+  "labels": {
+    "wrong_result": 138,
+    "exec_error": 179,
+    "correct": 180,
+    "no_sql": 1,
+    "gold_error": 2
+  }
+}

@@ -1,0 +1,12 @@
+.venv/
+.claude/
+data/
+wandb/
+__pycache__/
+*.log
+# outputs/ holds checkpoints and per-question predictions; only the small result files are committed
+outputs/*
+!outputs/eval/
+outputs/eval/*
+!outputs/eval/*_summary.json
+!outputs/eval/error_analysis.md

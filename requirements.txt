@@ -1,0 +1,9 @@
+# torch==2.11.0 comes from the CUDA index: pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu128
+accelerate==1.15.0
+bitsandbytes==0.50.2
+datasets==5.1.0
+gradio==6.31.0
+peft==0.21.2
+transformers==5.22.0
+trl==1.17.0
+wandb==0.31.0
